@@ -1,0 +1,11 @@
+[BEGINVDF]
+Comment=
+BaseDir=.\
+VDFName=.\TwitchIntegration.vdf
+[FILES]
+Ninja\TwitchIntegration\* -r
+_Work\* -r
+[EXCLUDE]
+*_DEV.*
+[INCLUDE]
+[ENDVDF]
