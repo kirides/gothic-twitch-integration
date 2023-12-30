@@ -244,7 +244,7 @@ func void Ninja_TwitchIntegration_Init() {
 	// Initialize Ikarus
 	MEM_InitAll();
 	// Initialize LeGo
-	// Lego_MergeFlags(LeGo_FrameFunctions);
+	Lego_MergeFlags(LeGo_FrameFunctions | LeGo_PrintS);
 	FF_ApplyOnceExtGT(Ninja_TwitchIntegration_FFHandle, 500, -1);
 };
 
