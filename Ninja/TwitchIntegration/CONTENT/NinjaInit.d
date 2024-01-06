@@ -19,23 +19,29 @@ const string TwitchIntegration_Command   = "";
 const string TwitchIntegration_Arguments = "";
 const int TwitchIntegration_Sound_Enabled = 1;
 
-const int Ninja_TwitchIntegration_MAX_DEFERRED = 2;
+const int Ninja_TwitchIntegration_MAX_DEFERRED = 40;
 const string Ninja_TwitchIntegration_Deferred[Ninja_TwitchIntegration_MAX_DEFERRED] = {
-	"", ""
+	"", "", "", "", "", "", "", "", "", "",
+	"", "", "", "", "", "", "", "", "", "",
+	"", "", "", "", "", "", "", "", "", "",
+	"", "", "", "", "", "", "", "", "", ""
 };
 
 const int Ninja_TwitchIntegration_Num_Deferred = 0;
 
 func int Ninja_TwitchIntegration_DeferEvent(var string event) {
-	const string numItemsQueued = ""; numItemsQueued = IntToString(+Ninja_TwitchIntegration_Num_Deferred);
+	const string numItemsQueued = "";
 
-	MEM_Info(ConcatStrings("TwitchIntegration: Number of Queued events: ", numItemsQueued));
 	if (Ninja_TwitchIntegration_Num_Deferred >= Ninja_TwitchIntegration_MAX_DEFERRED) {
+		numItemsQueued = IntToString(+Ninja_TwitchIntegration_Num_Deferred);
+		MEM_Info(ConcatStrings("TwitchIntegration: Number of Queued events: ", numItemsQueued));
 		return 0;
 	};
 	MEM_WriteStatStringArr(Ninja_TwitchIntegration_Deferred, Ninja_TwitchIntegration_Num_Deferred, event);
 	Ninja_TwitchIntegration_Num_Deferred += 1;
 
+	numItemsQueued = IntToString(+Ninja_TwitchIntegration_Num_Deferred);
+	MEM_Info(ConcatStrings("TwitchIntegration: Number of Queued events: ", numItemsQueued));
 	return 1;
 };
 
@@ -49,6 +55,7 @@ func int Ninja_TwitchIntegration_TryPopDeferredEvent(var int stringPtr) {
 
 	MEM_WriteString(stringPtr, str);
 	Ninja_TwitchIntegration_Num_Deferred -= 1;
+	MEM_WriteStatStringArr(Ninja_TwitchIntegration_Deferred, Ninja_TwitchIntegration_Num_Deferred, "");
 
 	return 1;
 };
@@ -257,16 +264,20 @@ func void Ninja_TwitchIntegration_FFHandle() {
 	if (Npc_IsDead(hero)) { return; };
 
 	const string event = "";
-	if (Ninja_TwitchIntegration_TryPopDeferredEvent(_@s(event))) {
-		MEM_Info(ConcatStrings("TwitchIntegration popped deferred event: ", event));
-	} else {
-		event = Ninja_TwitchIntegration_CurrentEvent();
-		MEM_Info(ConcatStrings("Twitch Integration: Current event: ", event));
-	};
+	event = Ninja_TwitchIntegration_CurrentEvent();
+	MEM_Info(ConcatStrings("Twitch Integration: Current event: ", event));
 
 	const string arg0 = "";
 	const string arg1 = "";
 	const string arg2 = "";
+
+	if (STR_SplitCount(event, " ") <3) {
+		if (Ninja_TwitchIntegration_TryPopDeferredEvent(_@s(event))) {
+			MEM_Info(ConcatStrings("TwitchIntegration popped deferred event: ", event));
+		} else {
+			return;
+		};
+	};
 
 	if (STR_SplitCount(event, " ") <3) {
 		return;
