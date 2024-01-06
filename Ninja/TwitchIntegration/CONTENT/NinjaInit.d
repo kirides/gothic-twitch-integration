@@ -17,7 +17,41 @@ const string TwitchIntegration_Print_Font = "FONT_OLD_10_WHITE.TGA";
 const string TwitchIntegration_User = "";
 const string TwitchIntegration_Command   = "";
 const string TwitchIntegration_Arguments = "";
+const int TwitchIntegration_Sound_Enabled = 1;
 
+const int Ninja_TwitchIntegration_MAX_DEFERRED = 2;
+const string Ninja_TwitchIntegration_Deferred[Ninja_TwitchIntegration_MAX_DEFERRED] = {
+	"", ""
+};
+
+const int Ninja_TwitchIntegration_Num_Deferred = 0;
+
+func int Ninja_TwitchIntegration_DeferEvent(var string event) {
+	const string numItemsQueued = ""; numItemsQueued = IntToString(+Ninja_TwitchIntegration_Num_Deferred);
+
+	MEM_Info(ConcatStrings("TwitchIntegration: Number of Queued events: ", numItemsQueued));
+	if (Ninja_TwitchIntegration_Num_Deferred >= Ninja_TwitchIntegration_MAX_DEFERRED) {
+		return 0;
+	};
+	MEM_WriteStatStringArr(Ninja_TwitchIntegration_Deferred, Ninja_TwitchIntegration_Num_Deferred, event);
+	Ninja_TwitchIntegration_Num_Deferred += 1;
+
+	return 1;
+};
+
+func int Ninja_TwitchIntegration_TryPopDeferredEvent(var int stringPtr) {
+	if (Ninja_TwitchIntegration_Num_Deferred <= 0) {
+		return 0;
+	};
+
+	var string str;
+	str = MEM_ReadStatStringArr(Ninja_TwitchIntegration_Deferred, Ninja_TwitchIntegration_Num_Deferred - 1);
+
+	MEM_WriteString(stringPtr, str);
+	Ninja_TwitchIntegration_Num_Deferred -= 1;
+
+	return 1;
+};
 
 func void _TwitchIntegration_PrintC(var string text, var int color) {
     const int _Print_Count_Limit = 30;
@@ -83,7 +117,22 @@ func string TwitchIntegration_ReadString(var int lpstr) {
 	return ret;
 };
 
-func int Ninja_TwitchIntegration_ReadOpt() {
+func string Ninja_TwitchIntegration_ReadOptDefault(var string opt, var string defVal) {
+	const string optCategory = "TwitchIntegration";
+	var string opt;
+	if (!MEM_GothOptExists(optCategory, opt)) {
+		MEM_SetGothOpt(optCategory, opt, defVal);
+		opt = defVal;
+	} else {
+		opt = MEM_GetGothOpt(optCategory, opt);
+	};
+	return opt;
+};
+
+func void Ninja_TwitchIntegration_ReadOpt() {
+	var string opt;
+	opt = Ninja_TwitchIntegration_ReadOptDefault("Sound_Enabled", "1");
+	TwitchIntegration_Sound_Enabled = Hlp_StrCmp(opt, "1");
 };
 
 const int Ninja_TwitchIntegration_InitComplete = 0;
@@ -121,36 +170,55 @@ func void Ninja_TwitchIntegration_Dummy() {
 	_TwitchIntegration_Print("Twitch Integration");
 };
 
-func void Ninja_TwitchIntegration_HandleREWARD_ADD(var string user, var string fn) {
-	const int fnIdx = -1;
-	fnIdx = MEM_FindParserSymbol(fn);
-	if (fnIdx != -1) {
-		_TwitchIntegration_PrintC(ConcatStrings(user, ConcatStrings(" hat ", ConcatStrings(fn, " ausgeführt"))), COL_Lime);
-		MEM_CallByID(fnIdx);
-	} else {
-		MEM_Info(ConcatStrings("Could not find function: ", fn));
+
+func int _Ninja_TwitchIntegration_CallFnRetInt(var int fnIdx) {
+	var zCPar_Symbol fncSymb; fncSymb = _^(MEM_GetSymbolByIndex(fnIdx));
+
+	if (fncSymb.offset) && (MEM_Parser.datastack_sptr > 0) {
+		if (fncSymb.offset == (zPAR_TYPE_INT >> 12)) {
+			// Safety checks on stack integrity
+			if (MEM_Parser.datastack_sptr >= 2) {
+				var int sPtr; sPtr = MEM_Parser.datastack_sptr; // Stack pointer is constantly changing so copy it
+				var int tok; tok = contentParserAddress + zCParser_datastack_stack_offset + (sPtr-1)*4;
+				if (MEM_ReadInt(tok) == zPAR_TOK_PUSHINT) || (MEM_ReadInt(tok) == zPAR_TOK_PUSHVAR) {
+					// There is indeed a valid return value
+					return +MEM_PopIntResult();
+				};
+			};
+		};
 	};
+	MEM_Info("TwitchIntegration: Function has no 'int' return value");
+	return 1;
 };
 
-func void Ninja_TwitchIntegration_HandleFOLLOW(var string user, var string fn) {
+func int _Ninja_TwitchIntegration_CallFn(var string user, var string fn) {
 	const int fnIdx = -1;
 	fnIdx = MEM_FindParserSymbol(fn);
+	const int fnWasExecuted = 0; fnWasExecuted = 0;
 	if (fnIdx != -1) {
-		_TwitchIntegration_PrintC(ConcatStrings(user, ConcatStrings(" hat ", ConcatStrings(fn, " ausgeführt"))), COL_Lime);
 		MEM_CallByID(fnIdx);
+		fnWasExecuted = +_Ninja_TwitchIntegration_CallFnRetInt(fnIdx);
 	} else {
 		MEM_Info(ConcatStrings("Could not find function: ", fn));
 	};
+
+	if (fnWasExecuted) {
+		_TwitchIntegration_PrintC(ConcatStrings(user, ConcatStrings(" hat ", ConcatStrings(fn, " ausgeführt"))), COL_Lime);
+	};
+
+	return +fnWasExecuted;
 };
-func void Ninja_TwitchIntegration_HandleCHAT(var string user, var string fn) {
-	const int fnIdx = -1;
-	fnIdx = MEM_FindParserSymbol(fn);
-	if (fnIdx != -1) {
-		_TwitchIntegration_PrintC(ConcatStrings(user, ConcatStrings(" hat ", ConcatStrings(fn, " ausgeführt"))), COL_Lime);
-		MEM_CallByID(fnIdx);
-	} else {
-		MEM_Info(ConcatStrings("Could not find function: ", fn));
-	};
+
+func int Ninja_TwitchIntegration_HandleREWARD_ADD(var string user, var string fn) {
+	return +_Ninja_TwitchIntegration_CallFn(user, fn);
+};
+
+func int Ninja_TwitchIntegration_HandleFOLLOW(var string user, var string fn) {
+	return +_Ninja_TwitchIntegration_CallFn(user, fn);
+};
+
+func int Ninja_TwitchIntegration_HandleCHAT(var string user, var string fn) {
+	return +_Ninja_TwitchIntegration_CallFn(user, fn);
 };
 
 func int Ninja_TWI_STR_IndexOf(var string str, var string tok, var int offset) {
@@ -186,9 +254,15 @@ func void Ninja_TwitchIntegration_FFHandle() {
 	if (!Ninja_TwitchIntegration_InitComplete) { return; };
 	if (!MEM_Game.timeStep)    { return; };
 	if (!Hlp_IsValidNpc(hero)) { return; };
+	if (Npc_IsDead(hero)) { return; };
 
-	const string event = ""; event = Ninja_TwitchIntegration_CurrentEvent();
-	// MEM_Info(ConcatStrings("Twitch Integration: Current event: ", event));
+	const string event = "";
+	if (Ninja_TwitchIntegration_TryPopDeferredEvent(_@s(event))) {
+		MEM_Info(ConcatStrings("TwitchIntegration popped deferred event: ", event));
+	} else {
+		event = Ninja_TwitchIntegration_CurrentEvent();
+		MEM_Info(ConcatStrings("Twitch Integration: Current event: ", event));
+	};
 
 	const string arg0 = "";
 	const string arg1 = "";
@@ -197,6 +271,7 @@ func void Ninja_TwitchIntegration_FFHandle() {
 	if (STR_SplitCount(event, " ") <3) {
 		return;
 	};
+
 	arg0 = STR_Split(event, " ", 0); // type
 	arg1 = STR_Split(event, " ", 1); // user
 	arg2 = STR_Split(event, " ", 2); // function
@@ -214,17 +289,24 @@ func void Ninja_TwitchIntegration_FFHandle() {
 	MEM_Info(ConcatStrings("TwitchIntegration_Command: ", TwitchIntegration_Command));
 	MEM_Info(ConcatStrings("TwitchIntegration_Arguments: ", TwitchIntegration_Arguments));
 
+	const int handled = 1; handled = 1;
+
 	if STR_StartsWith(arg0, "REWARD_ADD") {
 		MEM_Info(ConcatStrings("Event: ", event));
-		Ninja_TwitchIntegration_HandleREWARD_ADD(arg1, arg2);
+		handled = Ninja_TwitchIntegration_HandleREWARD_ADD(arg1, arg2);
 	} else if STR_StartsWith(arg0, "FOLLOW") {
 		MEM_Info(ConcatStrings("Event: ", event));
-		Ninja_TwitchIntegration_HandleFOLLOW(arg1, arg2);
+		handled = Ninja_TwitchIntegration_HandleFOLLOW(arg1, arg2);
 	} else if STR_StartsWith(arg0, "CHAT") {
 		MEM_Info(ConcatStrings("Event: ", event));
-		Ninja_TwitchIntegration_HandleCHAT(arg1, arg2);
+		handled = Ninja_TwitchIntegration_HandleCHAT(arg1, arg2);
 	} else {
 		// _TwitchIntegration_Print(event);
+	};
+	if (!handled) {
+		if (!Ninja_TwitchIntegration_DeferEvent(event)){
+
+		};
 	};
 };
 
