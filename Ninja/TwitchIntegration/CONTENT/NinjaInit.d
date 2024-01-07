@@ -2,22 +2,11 @@ const int TwitchIntegration_PROC_cInitIntegration     = 0;
 const int TwitchIntegration_PROC_cShutdownIntegration = 0;
 const int TwitchIntegration_PROC_cHandleEvents        = 0;
 
-
-const int _TwitchIntegration_Print_Count_Limit_Current = 0;
-const int _TwitchIntegration_Print_Duration = 8000;
-const int _TwitchIntegration_Print_Y = 2000;
-const int _TwitchIntegration_Print_X = 5500;
-const int _TwitchIntegration_Print_TextHeight = 150;
-const int _TwitchIntegration_Print_Count_Max = 30;
-const int _TwitchIntegration_Print_Count = 0;
-const int _TwitchIntegration_Print_Timer = 0;
-
-const string TwitchIntegration_Print_Font = "FONT_OLD_10_WHITE.TGA";
-
 const string TwitchIntegration_User = "";
 const string TwitchIntegration_Command   = "";
 const string TwitchIntegration_Arguments = "";
 const int TwitchIntegration_Sound_Enabled = 1;
+const int TwitchIntegration_Print_Redemptions = 1;
 
 const int Ninja_TwitchIntegration_MAX_DEFERRED = 40;
 const string Ninja_TwitchIntegration_Deferred[Ninja_TwitchIntegration_MAX_DEFERRED] = {
@@ -58,30 +47,6 @@ func int Ninja_TwitchIntegration_TryPopDeferredEvent(var int stringPtr) {
 	MEM_WriteStatStringArr(Ninja_TwitchIntegration_Deferred, Ninja_TwitchIntegration_Num_Deferred, "");
 
 	return 1;
-};
-
-func void _TwitchIntegration_PrintC(var string text, var int color) {
-    const int _Print_Count_Limit = 30;
-
-	if (_TwitchIntegration_Print_Count_Limit_Current > _Print_Count_Limit) { return; };
-	// If we, for some reason, have no font.
-	if (STR_Len(TwitchIntegration_Print_Font) == 0) { return; };
-
-	if (_TwitchIntegration_Print_Count >= _TwitchIntegration_Print_Count_Max) { _TwitchIntegration_Print_Count = 0; };
-	// restart from top if text would be out-of-bounds (Y-coords)
-	if ((_TwitchIntegration_Print_Y + (_TwitchIntegration_Print_TextHeight * _TwitchIntegration_Print_Count) + _TwitchIntegration_Print_TextHeight) >= PS_VMax) {
-		_TwitchIntegration_Print_Count = 0;
-	};
-
-	Print_Ext(_TwitchIntegration_Print_X, _TwitchIntegration_Print_Y + (_TwitchIntegration_Print_TextHeight * _TwitchIntegration_Print_Count), text, TwitchIntegration_Print_Font, color, _TwitchIntegration_Print_Duration);
-
-	_TwitchIntegration_Print_Count += 1;
-	_TwitchIntegration_Print_Timer = 0;
-	_TwitchIntegration_Print_Count_Limit_Current +=1;
-};
-
-func void _TwitchIntegration_Print(var string text) {
-    _TwitchIntegration_PrintC(text, COL_White);
 };
 
 //einfache Anwendung der obigen beiden Funktionen.
@@ -138,8 +103,11 @@ func string Ninja_TwitchIntegration_ReadOptDefault(var string opt, var string de
 
 func void Ninja_TwitchIntegration_ReadOpt() {
 	var string opt;
-	opt = Ninja_TwitchIntegration_ReadOptDefault("Sound_Enabled", "1");
+	opt = Ninja_TwitchIntegration_ReadOptDefault("Sound_Enabled", IntToString(TwitchIntegration_Sound_Enabled));
 	TwitchIntegration_Sound_Enabled = Hlp_StrCmp(opt, "1");
+
+	opt = Ninja_TwitchIntegration_ReadOptDefault("Print_Redemptions", IntToString(TwitchIntegration_Print_Redemptions));
+	TwitchIntegration_Print_Redemptions = Hlp_StrCmp(opt, "1");
 };
 
 const int Ninja_TwitchIntegration_InitComplete = 0;
@@ -173,11 +141,6 @@ func string Ninja_TwitchIntegration_CurrentEvent() {
     return TwitchIntegration_ReadString(lpstrRet);
 };
 
-func void Ninja_TwitchIntegration_Dummy() {
-	_TwitchIntegration_Print("Twitch Integration");
-};
-
-
 func int _Ninja_TwitchIntegration_CallFnRetInt(var int fnIdx) {
 	var zCPar_Symbol fncSymb; fncSymb = _^(MEM_GetSymbolByIndex(fnIdx));
 
@@ -210,7 +173,9 @@ func int _Ninja_TwitchIntegration_CallFn(var string user, var string fn) {
 	};
 
 	if (fnWasExecuted) {
-		_TwitchIntegration_PrintC(ConcatStrings(user, ConcatStrings(" hat ", ConcatStrings(fn, " ausgeführt"))), COL_Lime);
+		if (TwitchIntegration_Print_Redemptions) {
+			_TwitchIntegration_PrintC(ConcatStrings(user, ConcatStrings(" hat ", ConcatStrings(fn, " ausgeführt"))), COL_Lime);
+		};
 	};
 
 	return +fnWasExecuted;
@@ -318,16 +283,6 @@ func void Ninja_TwitchIntegration_FFHandle() {
 		if (!Ninja_TwitchIntegration_DeferEvent(event)){
 
 		};
-	};
-};
-
-func void Ninja_TwitchIntegration_FFTimer() {
-	_TwitchIntegration_Print_Timer += MEM_Timer.frameTime;
-	// Reset the Print-Counter if not printed for X milliseconds
-	if (_TwitchIntegration_Print_Timer > _TwitchIntegration_Print_Duration) {
-		_TwitchIntegration_Print_Count_Limit_Current = 0;
-		_TwitchIntegration_Print_Count = 0;
-		_TwitchIntegration_Print_Timer = 0;
 	};
 };
 
