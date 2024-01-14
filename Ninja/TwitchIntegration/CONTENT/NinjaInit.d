@@ -185,6 +185,10 @@ func int Ninja_TwitchIntegration_HandleREWARD_ADD(var string user, var string fn
 	return +_Ninja_TwitchIntegration_CallFn(user, fn);
 };
 
+func int Ninja_TwitchIntegration_HandleBITS_USED(var string user, var string fn) {
+	return +_Ninja_TwitchIntegration_CallFn(user, fn);
+};
+
 func int Ninja_TwitchIntegration_HandleFOLLOW(var string user, var string fn) {
 	return +_Ninja_TwitchIntegration_CallFn(user, fn);
 };
@@ -276,6 +280,9 @@ func void Ninja_TwitchIntegration_FFHandle() {
 	} else if STR_StartsWith(arg0, "CHAT") {
 		MEM_Info(ConcatStrings("Event: ", event));
 		handled = Ninja_TwitchIntegration_HandleCHAT(arg1, arg2);
+	} else if STR_StartsWith(arg0, "BITS_USED") {
+		MEM_Info(ConcatStrings("Event: ", event));
+		handled = Ninja_TwitchIntegration_HandleBITS_USED(arg1, arg2);
 	} else {
 		// _TwitchIntegration_Print(event);
 	};
